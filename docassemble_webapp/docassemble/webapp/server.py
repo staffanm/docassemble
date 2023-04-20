@@ -16957,7 +16957,7 @@ include README.md
 """
         setupcfg = """\
 [metadata]
-description-file = README
+description_file = README
 """
         setuppy = """\
 import os
