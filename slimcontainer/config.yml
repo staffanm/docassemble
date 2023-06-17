@@ -1,9 +1,12 @@
-debug: True
 # to not assume that there's a custom python install under /usr/share/docassemble/local3.10
 packages: /usr/local
 # to avoid exiting with "Unable to modify the timestamp of the WSGI file"
-enable playground: True
+allow restarting: False
+# to avoid having initialize trying to create /var/www/.pypirc, instead writing to config dir
+pypirc path: /usr/share/docassemble/config/.pypirc
 
+debug: True
+enable playground: True
 allow demo: True
 exitpage: https://docassemble.org
 db:
@@ -11,7 +14,7 @@ db:
   name: docassemble
   user: docassemble
   password: abc123
-  host: null
+  host: postgres
   port: null
   table prefix: null
   backup: true
@@ -45,8 +48,8 @@ language: sv
 locale: sv_SE.utf8
 os locale: sv_SE.UTF-8 UTF-8
 timezone: Europe/Stockholm
-redis: null
-rabbitmq: null
+redis: redis://redis
+rabbitmq: pyamqp://guest@rabbitmqserver.local//
 celery processes: null
 collect statistics: false
 kubernetes: false
@@ -61,12 +64,16 @@ behind https load balancer: false
 xsendfile: true
 update on start: initial
 allow updates: true
-url root: http://543858dc860f
+url root: http://da
 external hostname: none
 expose websockets: false
 websockets ip: null
 websockets port: null
-root: /da/
+# right now the uwsgi server and docassemble does not play nice with regards to
+# where the app should actually be mounted... need to dig further in how the
+# standard docassemble container uses wsgi to mount it at a path
+# root: /da/
+root: /
 words:
   - docassemble.base:data/sources/us-words.yml
   - docassemble.base:data/sources/sv-words.yml

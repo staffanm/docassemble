@@ -12,7 +12,7 @@ setup_requires = [
 install_requires = [
     'docassemble==1.4.59',
     'docassemble.base==1.4.59',
-    'docassemble.demo==1.4.59',
+#     'docassemble.demo==1.4.59', this pulls in a matplotlib dependency for a single demo case
     "3to2==1.1.1",
     "airtable-python-wrapper==0.15.3",
     "alembic==1.9.2",
