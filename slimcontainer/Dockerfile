@@ -275,11 +275,7 @@ COPY slimcontainer/setup.sh /tmp/
 RUN pip install -e ./docassemble_base && pip install -e ./docassemble_webapp
 
 # to enable www-user to write into system python's site-packages
-<<<<<<< HEAD
 RUN chmod 777 /usr/local/lib/python3.11/site-packages
-=======
-RUN chmod 777 /usr/local/lib/python3.10/site-packages
->>>>>>> 5e4a382073f02ad659b41a0623e3c9c5124b407e
 # to look after nltk only wherer we've prepared them
 ENV NLTK_DATA /usr/share/nltk_data
 # and don't try to look in /root/nltk_data as uid www-data
