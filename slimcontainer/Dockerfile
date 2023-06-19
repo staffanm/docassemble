@@ -1,4 +1,4 @@
-FROM python:3.10-bullseye
+FROM python:3.11
 ENV DEBIAN_FRONTEND noninteractive
 WORKDIR /usr/share/docassemble
 RUN apt update
@@ -275,7 +275,7 @@ COPY slimcontainer/setup.sh /tmp/
 RUN pip install -e ./docassemble_base && pip install -e ./docassemble_webapp
 
 # to enable www-user to write into system python's site-packages
-RUN chmod 777 /usr/local/lib/python3.10/site-packages
+RUN chmod 777 /usr/local/lib/python3.11/site-packages
 # to look after nltk only wherer we've prepared them
 ENV NLTK_DATA /usr/share/nltk_data
 # and don't try to look in /root/nltk_data as uid www-data

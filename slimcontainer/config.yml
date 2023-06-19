@@ -49,7 +49,7 @@ locale: sv_SE.utf8
 os locale: sv_SE.UTF-8 UTF-8
 timezone: Europe/Stockholm
 redis: redis://redis
-rabbitmq: pyamqp://guest@rabbitmqserver.local//
+rabbitmq: pyamqp://guest@rabbitmq//
 celery processes: null
 collect statistics: false
 kubernetes: false
