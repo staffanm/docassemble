@@ -9,7 +9,23 @@ services:
       - postgres
       - rabbitmq
     volumes:
-      - "../docassemble:/usr/share/docassemble/files"
+      - ../docassemble:/usr/share/docassemble/files
+#      - shared-tmp:/tmp
+      - site-packages:/usr/local/lib/python3.11/site-packages
+  # celery:
+  #   # run the exact same environment as the main docassemble container but use a
+  #   # different entrypoint to start celery instead of uwsgi/flask. FIXME: we
+  #   # should set environment variables LANG, TIMEZONE etc (see how run-celery.sh
+  #   # does it)
+  #   build:
+  #     dockerfile: slimcontainer/Dockerfile
+  #   entrypoint: ["celery", "-A", "docassemble.webapp.worker", "worker", "--loglevel=INFO", "--concurrency=1", "-Q", "celery"]
+  #   user: www-data
+  #   volumes:
+  #     - ../docassemble:/usr/share/docassemble/files
+  #     - shared-tmp:/tmp
+  #   depends_on:
+  #     - rabbitmq
   redis:
     image: redis:7
   postgres:
@@ -20,5 +36,7 @@ services:
       POSTGRES_DB: docassemble
   rabbitmq:
     image: rabbitmq:3
+volumes:
+  site-packages:
 
 

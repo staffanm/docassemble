@@ -1,9 +1,20 @@
-FROM python:3.11
+FROM python:3.11-slim
 ENV DEBIAN_FRONTEND noninteractive
+RUN apt update && apt install -y --no-install-recommends \
+        libaugeas0 \
+        libcairo2\
+        libcurl4 \
+        libldap-dev \
+        libsasl2-dev \
+        libzbar0 \
+        locales-all\
+        sudo\
+        unzip \
+        uwsgi && \
+    pip install --upgrade pip
 WORKDIR /usr/share/docassemble
-RUN apt update
-RUN apt install -y locales-all uwsgi libaugeas0 libzbar0 libldap-dev libsasl2-dev
-RUN pip install --upgrade pip
+# FROM base as builder
+RUN apt install -y --no-install-recommends gcc libssl-dev libcurl4-openssl-dev
 # install all packages required by setup.py for docassemble, but ahead of time so that rebuilding this image wont take forevever
 RUN pip install \
     "3to2==1.1.1" \
@@ -262,40 +273,47 @@ RUN pip install \
     "xlrd==2.0.1" \
     "XlsxWriter==3.0.8" \
     "xlwt==1.3.0" \
-    "zipp==3.12.0"
+    "zipp==3.12.0" \
+    "googledrivedownloader==0.4" \
+    "ics==0.7.2" \
+    "matplotlib==3.6.3"
+# FROM base
+# COPY --from=builder /install /usr/local
+
 RUN python -m nltk.downloader -d /usr/share/nltk_data omw-1.4 wordnet wordnet_ic sentiwordnet
 WORKDIR /usr/share/nltk_data/corpora
 RUN unzip omw-1.4.zip &&  unzip wordnet.zip
 WORKDIR /usr/share/docassemble
-RUN for d in log files config; do mkdir $d; chown www-data $d; done
+RUN for d in log files config webapp; do mkdir $d; chown www-data:www-data $d; done
+COPY docassemble_webapp/docassemble.wsgi /usr/share/docassemble/webapp/docassemble.wsgi
+RUN chown www-data:www-data /usr/share/docassemble/webapp/docassemble.wsgi
+COPY docassemble ./docassemble
 COPY docassemble_base ./docassemble_base
 COPY docassemble_webapp ./docassemble_webapp
+COPY docassemble_demo ./docassemble_demo
 COPY slimcontainer/config.yml /usr/share/docassemble/config/config.yml
-COPY slimcontainer/setup.sh /tmp/
-RUN pip install -e ./docassemble_base && pip install -e ./docassemble_webapp
-
-# to enable www-user to write into system python's site-packages
-RUN chmod 777 /usr/local/lib/python3.11/site-packages
+COPY slimcontainer/setup.sh /tmp/setup2.sh
+RUN pip install --no-deps ./docassemble ./docassemble_base ./docassemble_demo
+RUN pip install --no-deps -e ./docassemble_webapp
+RUN chmod 777 /usr/local/lib/python3.11/site-packages/docassemble
+RUN mkdir -p /var/www/.cache/pip && chmod 777 /var/www/.cache/pip
+RUN ls -l /tmp/
 # to look after nltk only wherer we've prepared them
 ENV NLTK_DATA /usr/share/nltk_data
 # and don't try to look in /root/nltk_data as uid www-data
 ENV APPENGINE_RUNTIME false
 EXPOSE 8080
-# NLTK_DATA=/usr/share/nltk_data APPENGINE_RUNTIME=false uwsgi --http :8080 --uid www-data --mount da=docassemble.webapp.server:app
-
-
 # at this point we may have a totally empty postgres db. we need to run
 #
 # python -m docassemble.webapp.create_tables /usr/share/docassemble/config/config.yml www-data
 #
 # going forward, we should create that config.yml based on env variables instead
 # of copying it from a static file
-
-ENTRYPOINT ["/bin/bash", "/tmp/setup.sh"]
+ENTRYPOINT ["/bin/bash", "/tmp/setup2.sh"]
 # FIXME: maybe it'd be better to use flask's DispatcherMiddleware to mount the app where we want it:
 # https://dlukes.github.io/flask-wsgi-url-prefix.html
 # and the use debugpy as the starting cmd, and having it execute the flask app itself:
 # https://medium.com/@lassebenninga/how-to-debug-flask-running-in-docker-compose-in-vs-code-ef37f0f516ee
 # since we've acttually gotten that to work in da-custom-frontend
-# CMD ["uwsgi", "--http", ":8080", "--uid", "www-data", "--mount", "/da=docassemble.webapp.server:app"]
-CMD ["uwsgi", "--http", ":8080", "--uid", "www-data", "--wsgi", "docassemble.webapp.server:app"]
+CMD ["/bin/bash", "-c", "sudo -u www-data celery -A docassemble.webapp.worker worker --loglevel=INFO --concurrency=1 -Q celery & uwsgi --http :8080 --uid www-data --wsgi docassemble.webapp.server:app --touch-reload /usr/share/docassemble/webapp/docassemble.wsgi"]
+# CMD ["/bin/bash", "cat"]

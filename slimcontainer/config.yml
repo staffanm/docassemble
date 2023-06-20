@@ -1,7 +1,5 @@
 # to not assume that there's a custom python install under /usr/share/docassemble/local3.10
 packages: /usr/local
-# to avoid exiting with "Unable to modify the timestamp of the WSGI file"
-allow restarting: False
 # to avoid having initialize trying to create /var/www/.pypirc, instead writing to config dir
 pypirc path: /usr/share/docassemble/config/.pypirc
 
