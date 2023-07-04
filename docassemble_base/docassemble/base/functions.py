@@ -56,7 +56,7 @@ from pylatex.utils import escape_latex
 # import operator
 import titlecase
 from docassemble.base.logger import logmessage
-from docassemble.base.error import ForcedNameError, QuestionError, ResponseError, CommandError, BackgroundResponseError, BackgroundResponseActionError, ForcedReRun, DAError
+from docassemble.base.error import ForcedNameError, QuestionError, ResponseError, CommandError, BackgroundResponseError, BackgroundResponseActionError, ForcedReRun, DAError, DANameError
 from docassemble.base.generate_key import random_string
 import docassemble.base.astparser
 from user_agents import parse as ua_parse
@@ -3632,7 +3632,7 @@ def force_ask(*pargs, **kwargs):
 
 
 def force_ask_nameerror(variable_name, priority=False):
-    raise NameError("name '" + str(variable_name) + "' is not defined")
+    raise DANameError("name '" + str(variable_name) + "' is not defined")
 
 
 def force_gather(*pargs, forget_prior=False, evaluate=False):
@@ -3815,6 +3815,8 @@ def package_question_filename(the_file):
     if len(parts) == 2:
         if not re.match(r'data/.*', parts[1]):
             parts[1] = 'data/questions/' + parts[1]
+        if len(parts[1]) > 268:
+            raise DAError("Invalid filename")
         try:
             path = Path(importlib.resources.files(parts[0]), parts[1])
         except:
