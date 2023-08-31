@@ -1,5 +1,107 @@
 # Change Log
 
+## [1.4.72] - 2023-08-23
+
+### Changed
+- The pseudo-fields `favorite_fruit[nota]` and `favorite_fruit[aota]`
+  referring to the "None of the above" and "All of the above"
+  checkboxes in a `datatype: checkboxes` field can now be used in a
+  boolean `show if`.
+
+## [1.4.71] - 2023-08-22
+
+### Changed
+- The `val()`, `getField()`, and `setField()` JavaScript functions can
+  references pseudo-fields `favorite_fruit[nota]` and
+  `favorite_fruit[aota]` to refer to the "None of the above" and "All
+  of the above" checkboxes in a `datatype: checkboxes` field.
+
+### Fixed
+- Bug introduced in 1.4.70 relating to GitHub URLs.
+
+## [1.4.70] - 2023-08-20
+
+### Changed
+- When installing a package with a GitHub URL, the
+  `#egg=mypackagename` feature of GitHub URLs is now respected, and
+  the name of the package will be extracted from `#egg` instead of
+  from the GitHub repository name.
+- Grouped the `initialize`, `postgres`, and `redis` Supervisor
+  processes into a group called `main` so that they shut down
+  simultaneously rather than sequentially.
+
+### Fixed
+- The `js show if` feature did not work correctly when an expression
+  reference two different fields.
+- The `auto terms` and `terms` features interfered with each other
+  when the same term was referenced in each.
+- Bug in locale-setting code.
+- The system for forcing the admin user to change their password when
+  the password is `password` introduced unnecessary delay on page
+  loads.
+- The "Please wait while docassemble starts . . ." page would refresh
+  into an error rather than refresh into the default interview under
+  some conditions.
+
+## [1.4.69] - 2023-08-15
+
+### Fixed
+- The `val()` JavaScript function erroneously returned encoded values
+  for `datatype: object` and `datatype: object_radio` fields. The
+  function has been modified so that it returns the `instanceName` of
+  the selected object.
+- The combobox HTML did not set an `aria-label`.
+- Markdown-to-HTML conversion in popover `help` text was not
+  full-featured.
+
+## [1.4.68] - 2023-08-10
+
+### Changed
+- The `ldap login` feature now supports TLS and anonymous binding.
+
+### Fixed
+- Error with exporting tables to Excel, caused by the upgrade of the
+  Pandas dependency.
+- The way that locale-related functions actually worked did not match
+  the way they were documented; they have been fixed so that they
+  match the way they are documented. The `update_locale()` function is
+  also now imported by default.
+- Bug with handling of non-required object fields that are not
+  answered.
+
+## [1.4.67] - 2023-07-28
+
+### Changed
+- Upgraded `webdriver_manager`.
+- The `.delete()` method of `DAGlobal` will now exit silently if
+  called on a `DAGlobal` object that has already been deleted.
+
+## [1.4.66] - 2023-07-24
+
+### Changed
+- Upgraded dependencies. Packages that might require code changes
+  include `selenium` (now at version 4) and `matplotlib` (see the
+  "Generating a graph and inserting it into a document" recipe). Due
+  to incompatibilities with the latest version of `markdown`, the
+  `mdx_smartypants` extension is no longer being used. Instead the
+  standard `smarty` extension is used. There are some differences
+  between the two extensions, such as the transformation of ellipses.
+
+### Fixed
+- Adapted code so no error will be raised if docassemble tries to
+  create a directory where one already exists. A race condition of
+  some sort seemed to be causing such errors for some users.
+
+## [1.4.65] - 2023-07-13
+
+### Fixed
+- The `navigation: horizontal` feature was not functional.
+
+## [1.4.64] - 2023-07-11
+
+### Fixed
+- Issue with the `NameError` exception change in 1.4.63.
+
 ## [1.4.63] - 2023-07-02
 
 ### Changed

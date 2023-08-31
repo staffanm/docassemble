@@ -24,7 +24,6 @@ import tzlocal
 import us
 import pycountry
 import markdown
-from mdx_smartypants import SmartypantsExt
 import nltk
 try:
     if not os.path.isfile(os.path.join(nltk.data.path[0], 'corpora', 'omw-1.4.zip')):
@@ -84,7 +83,6 @@ __all__ = ['alpha', 'roman', 'item_label', 'ordinal', 'ordinal_number', 'comma_l
 # except:
 #     default_timezone = 'America/New_York'
 # daconfig = {}
-smartyext = SmartypantsExt(configs={})
 dot_split = re.compile(r'([^\.\[\]]+(?:\[.*?\])?)')
 newlines = re.compile(r'[\r\n]+')
 single_newline = re.compile(r'[\r\n]')
@@ -1938,7 +1936,7 @@ this_thread.gathering_mode = {}
 this_thread.global_vars = GenericObject()
 this_thread.current_variable = []
 this_thread.open_files = set()
-this_thread.markdown = markdown.Markdown(extensions=[smartyext, 'markdown.extensions.sane_lists', 'markdown.extensions.tables', 'markdown.extensions.attr_list', 'markdown.extensions.md_in_html', 'footnotes'], output_format='html5')
+this_thread.markdown = markdown.Markdown(extensions=['smarty', 'markdown.extensions.sane_lists', 'markdown.extensions.tables', 'markdown.extensions.attr_list', 'markdown.extensions.md_in_html', 'footnotes'], output_format='html5')
 this_thread.saved_files = {}
 this_thread.message_log = []
 this_thread.misc = {}
@@ -2394,7 +2392,7 @@ def reset_local_variables():
     this_thread.current_question = None
     this_thread.current_section = None
     this_thread.internal = {}
-    this_thread.markdown = markdown.Markdown(extensions=[smartyext, 'markdown.extensions.sane_lists', 'markdown.extensions.tables', 'markdown.extensions.attr_list', 'markdown.extensions.md_in_html', 'footnotes'], output_format='html5')
+    this_thread.markdown = markdown.Markdown(extensions=['smarty', 'markdown.extensions.sane_lists', 'markdown.extensions.tables', 'markdown.extensions.attr_list', 'markdown.extensions.md_in_html', 'footnotes'], output_format='html5')
     this_thread.prevent_going_back = False
 
 
@@ -2467,8 +2465,8 @@ def get_locale(*pargs):
 
     """
     if len(pargs) == 1:
-        if 'locale_override' in this_thread.misc and pargs[0] in this_thread.misc['locale_override']:
-            return this_thread.misc['locale_override'][pargs[0]]
+        if 'locale_overrides' in this_thread.misc and pargs[0] in this_thread.misc['locale_overrides']:
+            return this_thread.misc['locale_overrides'][pargs[0]]
         return locale.localeconv().get(pargs[0], None)
     return this_thread.locale
 
@@ -2478,17 +2476,22 @@ def get_currency_symbol():
     one, and otherwise returns the default currency symbol.
 
     """
-    if 'locale_override' in this_thread.misc and 'currency_symbol' in this_thread.misc['locale_override']:
-        return this_thread.misc['locale_override']['currency_symbol']
+    if 'locale_overrides' in this_thread.misc and 'currency_symbol' in this_thread.misc['locale_overrides']:
+        return this_thread.misc['locale_overrides']['currency_symbol']
     return currency_symbol()
 
 
 def update_locale():
     """Updates the system locale based on the value set by set_locale()."""
+    if '_' in this_thread.locale:
+        the_locale = str(this_thread.locale)
+    else:
+        the_locale = str(this_thread.language) + '_' + str(this_thread.locale)
     try:
-        locale.setlocale(locale.LC_ALL, str(this_thread.locale))
-    except:
-        logmessage("update_locale error: unable to set the locale to " + str(this_thread.locale))
+        locale.setlocale(locale.LC_ALL, the_locale)
+    except Exception as err:
+        logmessage("update_locale error: unable to set the locale to " + the_locale)
+        logmessage(err.__class__.__name__ + ": " + str(err))
         locale.setlocale(locale.LC_ALL, 'en_US.utf8')
 
 

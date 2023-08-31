@@ -6237,7 +6237,7 @@ def checkin():
                         result = docassemble.webapp.worker.workerapp.AsyncResult(id=worker_id)
                         if result.ready():
                             if isinstance(result.result, ReturnValue):
-                                commands.append({'value': result.result.value, 'extra': result.result.extra})
+                                commands.append({'value': docassemble.base.functions.safe_json(result.result.value), 'extra': result.result.extra})
                         else:
                             r.rpush(worker_key, worker_id)
                     except Exception as errstr:
@@ -7427,7 +7427,10 @@ def index(action_argument=None, refer=None):
             elif known_datatypes[real_key] in ('object', 'object_radio'):
                 if raw_data == '' or set_to_empty:
                     continue
-                data = "_internal['objselections'][" + repr(key) + "][" + repr(raw_data) + "]"
+                if raw_data == 'None':
+                    data = 'None'
+                else:
+                    data = "_internal['objselections'][" + repr(key) + "][" + repr(raw_data) + "]"
             elif known_datatypes[real_key] in ('object_multiselect', 'object_checkboxes') and bracket_expression is not None:
                 if raw_data not in ('True', 'False', 'None') or set_to_empty:
                     continue
@@ -7573,7 +7576,10 @@ def index(action_argument=None, refer=None):
             elif known_datatypes[orig_key] in ('object', 'object_radio'):
                 if raw_data == '' or set_to_empty:
                     continue
-                data = "_internal['objselections'][" + repr(key) + "][" + repr(raw_data) + "]"
+                if data == 'None':
+                    data = 'None'
+                else:
+                    data = "_internal['objselections'][" + repr(key) + "][" + repr(raw_data) + "]"
             elif set_to_empty in ('object_multiselect', 'object_checkboxes'):
                 continue
             elif real_key in known_datatypes and known_datatypes[real_key] in ('file', 'files', 'camera', 'user', 'environment'):
@@ -8528,6 +8534,7 @@ def index(action_argument=None, refer=None):
       var daDoAction = """ + do_action + """;
       var daQuestionID = """ + json.dumps(question_id_dict) + """;
       var daCsrf = """ + json.dumps(generate_csrf()) + """;
+      var daComboboxButtonLabel = """ + json.dumps(word("Dropdown")) + """;
       var daShowIfInProcess = false;
       var daFieldsToSkip = ['_checkboxes', '_empties', '_ml_info', '_back_one', '_files', '_files_inline', '_question_name', '_the_image', '_save_as', '_success', '_datatypes', '_event', '_visible', '_tracker', '_track_location', '_varnames', '_next_action', '_next_action_to_set', 'ajax', 'json', 'informed', 'csrf_token', '_action', '_order_changes', '_collect', '_list_collect_list', '_null_question'];
       var daVarLookup = Object();
@@ -8754,7 +8761,7 @@ def index(action_argument=None, refer=None):
                 if (notInDiv && $.contains(notInDiv, elem)){
                   continue;
                 }
-                return daVarLookupCheckbox[fieldName][i].fieldset;
+                return daVarLookupCheckbox[fieldName][i].elem;
               }
             }
           }
@@ -9003,7 +9010,10 @@ def index(action_argument=None, refer=None):
             theVal = null;
           }
           else{
-            if (theVal == 'True'){
+            if ($(elem).hasClass("daobject")){
+              theVal = atou(theVal);
+            }
+            else if (theVal == 'True'){
               theVal = true;
             }
             else if (theVal == 'False'){
@@ -9047,6 +9057,9 @@ def index(action_argument=None, refer=None):
             });
             return selectedVals;
           }
+        }
+        else if ($(elem).prop('tagName') == "SELECT" && $(elem).hasClass('daobject')){
+          theVal = atou($(elem).val());
         }
         else{
           theVal = $(elem).val();
@@ -10943,6 +10956,8 @@ def index(action_argument=None, refer=None):
       function daInitialize(doScroll){
         daResetCheckinCode();
         daComboBoxes = Object();
+        daVarLookupSelect = Object();
+        daVarLookupCheckbox = Object();
         if (daSpinnerTimeout != null){
           clearTimeout(daSpinnerTimeout);
           daSpinnerTimeout = null;
@@ -11133,7 +11148,19 @@ def index(action_argument=None, refer=None):
             }
             cbList.push({'variable': key, 'value': theVal, 'type': theType, 'elem': this})
           });
-          daVarLookupCheckbox[varname].push({'fieldset': this, 'checkboxes': cbList, 'isObject': isObject});
+          daVarLookupCheckbox[varname].push({'elem': this, 'checkboxes': cbList, 'isObject': isObject});
+          $(this).find('input.danota-checkbox').each(function(){
+            if (!daVarLookupCheckbox[varname + '[nota]']){
+              daVarLookupCheckbox[varname + '[nota]'] = [];
+            }
+            daVarLookupCheckbox[varname + '[nota]'].push({'elem': this, 'checkboxes': [{'variable': varname + '[nota]', 'type': 'X', 'elem': this}], 'isObject': isObject});
+          });
+          $(this).find('input.daaota-checkbox').each(function(){
+            if (!daVarLookupCheckbox[varname + '[aota]']){
+              daVarLookupCheckbox[varname + '[aota]'] = [];
+            }
+            daVarLookupCheckbox[varname + '[aota]'].push({'elem': this, 'checkboxes': [{'variable': varname + '[aota]', 'type': 'X', 'elem': this}], 'isObject': isObject});
+          });
         });
         $('.dacurrency').each(function(){
           var theVal = $(this).val().toString();
@@ -11195,13 +11222,22 @@ def index(action_argument=None, refer=None):
           daShowingHelp = 0;""" + debug_readability_question + """
         });
         $("input.daaota-checkbox").click(function(){
+          var anyChanged = false;
+          var firstEncountered = null;
           $(this).parents('fieldset').find('input.danon-nota-checkbox').each(function(){
+            if (firstEncountered === null){
+              firstEncountered = this;
+            }
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', true);
             if (existing_val != true){
               $(this).trigger('change');
+              anyChanged = true;
             }
           });
+          if (firstEncountered !== null && anyChanged === false){
+            $(firstEncountered).trigger('change');
+          }
           $(this).parents('fieldset').find('input.danota-checkbox').each(function(){
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', false);
@@ -11211,13 +11247,22 @@ def index(action_argument=None, refer=None):
           });
         });
         $("input.danota-checkbox").click(function(){
+          var anyChanged = false;
+          var firstEncountered = null;
           $(this).parents('fieldset').find('input.danon-nota-checkbox').each(function(){
+            if (firstEncountered === null){
+              firstEncountered = this;
+            }
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', false);
             if (existing_val != false){
               $(this).trigger('change');
+              anyChanged = true;
             }
           });
+          if (firstEncountered !== null && anyChanged === false){
+            $(firstEncountered).trigger('change');
+          }
           $(this).parents('fieldset').find('input.daaota-checkbox').each(function(){
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', false);
@@ -11244,8 +11289,8 @@ def index(action_argument=None, refer=None):
             });
           }
         });
-        $('select.combobox').combobox();
-        $('select.da-ajax-combobox').combobox({clearIfNoMatch: true});
+        $('select.combobox').combobox({buttonLabel: daComboboxButtonLabel});
+        $('select.da-ajax-combobox').combobox({clearIfNoMatch: true, buttonLabel: daComboboxButtonLabel});
         $('input.da-ajax-combobox').each(function(){
           var cb = daComboBoxes[$(this).attr("id")];
           daFetchAjax(this, cb, false);
@@ -11720,10 +11765,9 @@ def index(action_argument=None, refer=None):
           var showIfSign = jsInfo['sign'];
           var showIfMode = jsInfo['mode'];
           var jsExpression = jsInfo['expression'];
-          var n = jsInfo['vars'].length;
-          for (var i = 0; i < n; ++i){
+          jsInfo['vars'].forEach(function(infoItem, i){
             var showIfVars = [];
-            var initShowIfVar = utoa(jsInfo['vars'][i]).replace(/[\\n=]/g, '');
+            var initShowIfVar = utoa(infoItem).replace(/[\\n=]/g, '');
             var initShowIfVarEscaped = initShowIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
             var elem = $("[name='" + initShowIfVarEscaped + "']");
             if (elem.length > 0){
@@ -11740,12 +11784,11 @@ def index(action_argument=None, refer=None):
               }
             }
             if (showIfVars.length == 0){
-              console.log("ERROR: reference to non-existent field " + jsInfo['vars'][i]);
+              console.log("ERROR: reference to non-existent field " + infoItem);
             }
-            for (var j = 0; j < showIfVars.length; ++j){
-              var showIfVar = showIfVars[j];
+            showIfVars.forEach(function(showIfVar){
               var showIfVarEscaped = showIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
-              var varToUse = jsInfo['vars'][i];
+              var varToUse = infoItem;
               var showHideDiv = function(speed){
                 var elem = daGetField(varToUse);
                 if (elem != null && !$(elem).parents('.da-form-group').first().is($(this).parents('.da-form-group').first())){
@@ -11847,8 +11890,8 @@ def index(action_argument=None, refer=None):
               $("#" + showIfVarEscaped).on('daManualTrigger', showHideDivImmediate);
               $("input[type='radio'][name='" + showIfVarEscaped + "']").on('daManualTrigger', showHideDivImmediate);
               $("input[type='checkbox'][name='" + showIfVarEscaped + "']").on('daManualTrigger', showHideDivImmediate);
-            }
-          }
+            });
+          });
         });
         $(".dashowif").each(function(){
           var showIfVars = [];
@@ -11856,8 +11899,22 @@ def index(action_argument=None, refer=None):
           var showIfMode = parseInt($(this).data('showif-mode'));
           var initShowIfVar = $(this).data('showif-var');
           var varName = atou(initShowIfVar);
-          var initShowIfVarEscaped = initShowIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
-          var elem = $("[name='" + initShowIfVarEscaped + "']");
+          var elem = [];
+          if (varName.endsWith('[nota]') || varName.endsWith('[aota]')){
+            var signifier = varName.endsWith('[nota]') ? 'nota' : 'aota';
+            var cbVarName = varName.replace(/\[[na]ota\]$/, '');
+            $('fieldset.da-field-checkboxes').each(function(){
+              var thisVarName = atou($(this).data('varname'));
+              if (thisVarName == cbVarName){
+                elem = $(this).find('input.da' + signifier + '-checkbox');
+                initShowIfVar = $(elem).attr('name');
+              }
+            });
+          }
+          else {
+            var initShowIfVarEscaped = initShowIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
+            elem = $("[name='" + initShowIfVarEscaped + "']");
+          }
           if (elem.length > 0){
             showIfVars.push(initShowIfVar);
           }
@@ -11875,9 +11932,7 @@ def index(action_argument=None, refer=None):
           var showIfVal = $(this).data('showif-val');
           var saveAs = $(this).data('saveas');
           var showIfDiv = this;
-          var n = showIfVars.length;
-          for (var i = 0; i < n; ++i){
-            var showIfVar = showIfVars[i];
+          showIfVars.forEach(function(showIfVar){
             var showIfVarEscaped = showIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
             var showHideDiv = function(speed){
               var elem = daGetField(varName, showIfDiv);
@@ -12019,7 +12074,7 @@ def index(action_argument=None, refer=None):
             $("input[type='checkbox'][name='" + showIfVarEscaped + "']").change(showHideDivFast);
             $("input[type='checkbox'][name='" + showIfVarEscaped + "']").on('daManualTrigger', showHideDivImmediate);
             $("input.dafile[name='" + showIfVarEscaped + "']").on('filecleared', showHideDivFast);
-          }
+          });
         });
         function daTriggerAllShowHides(){
           var daUniqueTriggerQueries = daTriggerQueries.filter(daOnlyUnique);
@@ -13685,6 +13740,7 @@ def observer():
       var daVarLookupCheckbox = Object();
       var daVarLookupOption = Object();
       var daTargetDiv = "#dabody";
+      var daComboBoxes = Object();
       var daLocationBar = """ + json.dumps(url_for('index', i=i)) + """;
       var daPostURL = """ + json.dumps(url_for('index', i=i, _external=True)) + """;
       var daYamlFilename = """ + json.dumps(i) + """;
@@ -13964,7 +14020,7 @@ def observer():
                 if (notInDiv && $.contains(notInDiv, elem)){
                   continue;
                 }
-                return daVarLookupCheckbox[fieldName][i].fieldset;
+                return daVarLookupCheckbox[fieldName][i].elem;
               }
             }
           }
@@ -14213,7 +14269,10 @@ def observer():
             theVal = null;
           }
           else{
-            if (theVal == 'True'){
+            if ($(elem).hasClass("daobject")){
+              theVal = atou(theVal);
+            }
+            else if (theVal == 'True'){
               theVal = true;
             }
             else if (theVal == 'False'){
@@ -14257,6 +14316,9 @@ def observer():
             });
             return selectedVals;
           }
+        }
+        else if ($(elem).prop('tagName') == "SELECT" && $(elem).hasClass('daobject')){
+          theVal = atou($(elem).val());
         }
         else{
           theVal = $(elem).val();
@@ -14603,6 +14665,9 @@ def observer():
       }
       var da_get_interview_variables = get_interview_variables;
       function daInitialize(doScroll){
+        daComboBoxes = Object();
+        daVarLookupSelect = Object();
+        daVarLookupCheckbox = Object();
         if (daSpinnerTimeout != null){
           clearTimeout(daSpinnerTimeout);
           daSpinnerTimeout = null;
@@ -14624,13 +14689,22 @@ def observer():
           return new bootstrap.Popover(daPopoverTriggerEl, {trigger: "focus", html: true});
         });
         $("input.daaota-checkbox").click(function(){
+          var anyChanged = false;
+          var firstEncountered = null;
           $(this).parents('fieldset').find('input.danon-nota-checkbox').each(function(){
+            if (firstEncountered === null){
+              firstEncountered = this;
+            }
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', true);
             if (existing_val != true){
               $(this).trigger('change');
+              anyChanged = true;
             }
           });
+          if (firstEncountered !== null && anyChanged === false){
+            $(firstEncountered).trigger('change');
+          }
           $(this).parents('fieldset').find('input.danota-checkbox').each(function(){
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', false);
@@ -14640,13 +14714,22 @@ def observer():
           });
         });
         $("input.danota-checkbox").click(function(){
+          var anyChanged = false;
+          var firstEncountered = null;
           $(this).parents('fieldset').find('input.danon-nota-checkbox').each(function(){
+            if (firstEncountered === null){
+              firstEncountered = this;
+            }
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', false);
             if (existing_val != false){
               $(this).trigger('change');
+              anyChanged = true;
             }
           });
+          if (firstEncountered !== null && anyChanged === false){
+            $(firstEncountered).trigger('change');
+          }
           $(this).parents('fieldset').find('input.daaota-checkbox').each(function(){
             var existing_val = $(this).prop('checked');
             $(this).prop('checked', false);
@@ -14732,7 +14815,7 @@ def observer():
             }
             cbList.push({'variable': key, 'value': theVal, 'type': theType, 'elem': this})
           });
-          daVarLookupCheckbox[varname].push({'fieldset': this, 'checkboxes': cbList, 'isObject': isObject});
+          daVarLookupCheckbox[varname].push({'elem': this, 'checkboxes': cbList, 'isObject': isObject});
         });
         $('.dacurrency').each(function(){
           var theVal = $(this).val().toString();
@@ -14775,10 +14858,9 @@ def observer():
           var showIfSign = jsInfo['sign'];
           var showIfMode = jsInfo['mode'];
           var jsExpression = jsInfo['expression'];
-          var n = jsInfo['vars'].length;
-          for (var i = 0; i < n; ++i){
+          jsInfo['vars'].forEach(function(infoItem, i){
             var showIfVars = [];
-            var initShowIfVar = utoa(jsInfo['vars'][i]).replace(/[\\n=]/g, '');
+            var initShowIfVar = utoa(infoItem).replace(/[\\n=]/g, '');
             var initShowIfVarEscaped = initShowIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
             var elem = $("[name='" + initShowIfVarEscaped + "']");
             if (elem.length > 0){
@@ -14795,13 +14877,13 @@ def observer():
               }
             }
             if (showIfVars.length == 0){
-              console.log("ERROR: reference to non-existent field " + jsInfo['vars'][i]);
+              console.log("ERROR: reference to non-existent field " + infoItem);
             }
-            for (var j = 0; j < showIfVars.length; ++j){
-              var showIfVar = showIfVars[j];
+            showIfVars.forEach(function(showIfVar){
               var showIfVarEscaped = showIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
+              var varToUse = infoItem;
               var showHideDiv = function(speed){
-                var elem = daGetField(jsInfo['vars'][i]);
+                var elem = daGetField(varToUse);
                 if (elem != null && !$(elem).parents('.da-form-group').first().is($(this).parents('.da-form-group').first())){
                   return;
                 }
@@ -14901,8 +14983,8 @@ def observer():
               $("#" + showIfVarEscaped).on('daManualTrigger', showHideDivImmediate);
               $("input[type='radio'][name='" + showIfVarEscaped + "']").on('daManualTrigger', showHideDivImmediate);
               $("input[type='checkbox'][name='" + showIfVarEscaped + "']").on('daManualTrigger', showHideDivImmediate);
-            }
-          }
+            });
+          });
         });
         $(".dashowif").each(function(){
           var showIfVars = [];
@@ -14910,8 +14992,22 @@ def observer():
           var showIfMode = parseInt($(this).data('showif-mode'));
           var initShowIfVar = $(this).data('showif-var');
           var varName = atou(initShowIfVar);
-          var initShowIfVarEscaped = initShowIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
-          var elem = $("[name='" + initShowIfVarEscaped + "']");
+          var elem = [];
+          if (varName.endsWith('[nota]') || varName.endsWith('[aota]')){
+            var signifier = varName.endsWith('[nota]') ? 'nota' : 'aota';
+            var cbVarName = varName.replace(/\[[na]ota\]$/, '');
+            $('fieldset.da-field-checkboxes').each(function(){
+              var thisVarName = atou($(this).data('varname'));
+              if (thisVarName == cbVarName){
+                elem = $(this).find('input.da' + signifier + '-checkbox');
+                initShowIfVar = $(elem).attr('name');
+              }
+            });
+          }
+          else {
+            var initShowIfVarEscaped = initShowIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
+            elem = $("[name='" + initShowIfVarEscaped + "']");
+          }
           if (elem.length > 0){
             showIfVars.push(initShowIfVar);
           }
@@ -14929,9 +15025,7 @@ def observer():
           var showIfVal = $(this).data('showif-val');
           var saveAs = $(this).data('saveas');
           var showIfDiv = this;
-          var n = showIfVars.length;
-          for (var i = 0; i < n; ++i){
-            var showIfVar = showIfVars[i];
+          showIfVars.forEach(function(showIfVar){
             var showIfVarEscaped = showIfVar.replace(/(:|\.|\[|\]|,|=)/g, "\\\\$1");
             var showHideDiv = function(speed){
               var elem = daGetField(varName, showIfDiv);
@@ -14984,13 +15078,16 @@ def observer():
                     $(showIfDiv).show(speed);
                   }
                   $(showIfDiv).data('isVisible', '1');
-                  $(showIfDiv).find('input, textarea, select').prop("disabled", false);
-                  $(showIfDiv).find('input.combobox').each(function(){
-                    daComboBoxes[$(this).attr('id')].enable();
-                  });
-                  $(showIfDiv).find('input.dafile').each(function(){
-                    $(this).data("fileinput").enable();
-                  });
+                  var firstChild = $(showIfDiv).children()[0];
+                  if (!$(firstChild).hasClass('dacollectextra') || $(firstChild).is(":visible")){
+                    $(showIfDiv).find('input, textarea, select').prop("disabled", false);
+                    $(showIfDiv).find('input.combobox').each(function(){
+                      daComboBoxes[$(this).attr('id')].enable();
+                    });
+                    $(showIfDiv).find('input.dafile').each(function(){
+                      $(this).data("fileinput").enable();
+                    });
+                  }
                 }
                 else{
                   if ($(showIfDiv).data('isVisible') != '0'){
@@ -15022,9 +15119,6 @@ def observer():
                   $(showIfDiv).find('input.combobox').each(function(){
                     daComboBoxes[$(this).attr('id')].disable();
                   });
-                  $(showIfDiv).find('input.dafile').each(function(){
-                    $(this).data("fileinput").disable();
-                  });
                 }
                 else{
                   if ($(showIfDiv).data('isVisible') != '1'){
@@ -15034,13 +15128,16 @@ def observer():
                     $(showIfDiv).show(speed);
                   }
                   $(showIfDiv).data('isVisible', '1');
-                  $(showIfDiv).find('input, textarea, select').prop("disabled", false);
-                  $(showIfDiv).find('input.combobox').each(function(){
-                    daComboBoxes[$(this).attr('id')].enable();
-                  });
-                  $(showIfDiv).find('input.dafile').each(function(){
-                    $(this).data("fileinput").enable();
-                  });
+                  var firstChild = $(showIfDiv).children()[0];
+                  if (!$(firstChild).hasClass('dacollectextra') || $(firstChild).is(":visible")){
+                    $(showIfDiv).find('input, textarea, select').prop("disabled", false);
+                    $(showIfDiv).find('input.combobox').each(function(){
+                      daComboBoxes[$(this).attr('id')].enable();
+                    });
+                    $(showIfDiv).find('input.dafile').each(function(){
+                      $(this).data("fileinput").enable();
+                    });
+                  }
                 }
               }
               var daThis = this;
@@ -15070,7 +15167,7 @@ def observer():
             $("input[type='checkbox'][name='" + showIfVarEscaped + "']").change(showHideDivFast);
             $("input[type='checkbox'][name='" + showIfVarEscaped + "']").on('daManualTrigger', showHideDivImmediate);
             $("input.dafile[name='" + showIfVarEscaped + "']").on('filecleared', showHideDivFast);
-          }
+          });
         });
         function daTriggerAllShowHides(){
           var daUniqueTriggerQueries = daTriggerQueries.filter(daOnlyUnique);
@@ -16728,12 +16825,17 @@ def update_package():
                 branch = form.gitbranch.data.strip()
                 if not branch:
                     branch = get_master_branch(giturl)
-                packagename = re.sub(r'/*$', '', giturl)
-                packagename = re.sub(r'^git+', '', packagename)
-                packagename = re.sub(r'#.*', '', packagename)
-                packagename = re.sub(r'\.git$', '', packagename)
-                packagename = re.sub(r'.*/', '', packagename)
-                packagename = re.sub(r'^docassemble-', 'docassemble.', packagename)
+                m = re.search(r'#egg=(.*)', giturl)
+                if m:
+                    packagename = re.sub(r'&.*', '', m.group(1))
+                    giturl = re.sub(r'#.*', '', giturl)
+                else:
+                    packagename = re.sub(r'/*$', '', giturl)
+                    packagename = re.sub(r'^git+', '', packagename)
+                    packagename = re.sub(r'#.*', '', packagename)
+                    packagename = re.sub(r'\.git$', '', packagename)
+                    packagename = re.sub(r'.*/', '', packagename)
+                    packagename = re.sub(r'^docassemble-', 'docassemble.', packagename)
                 if user_can_edit_package(giturl=giturl) and user_can_edit_package(pkgname=packagename):
                     install_git_package(packagename, giturl, branch)
                     result = docassemble.webapp.worker.update_packages.apply_async(link=docassemble.webapp.worker.reset_server.s(run_create=should_run_create(packagename)))
@@ -19882,6 +19984,7 @@ def get_branches_of_repo(giturl):
     repo_name = re.sub(r'^http.*github.com/', '', repo_name)
     repo_name = re.sub(r'.*@github.com:', '', repo_name)
     repo_name = re.sub(r'.git$', '', repo_name)
+    repo_name = re.sub(r'#egg=.*', '', repo_name)
     if app.config['USE_GITHUB']:
         github_auth = r.get('da:using_github:userid:' + str(current_user.id))
     else:
@@ -19920,6 +20023,7 @@ def get_branches_of_repo(giturl):
 
 
 def get_repo_info(giturl):
+    giturl = re.sub(r'#.*', '', giturl)
     repo_name = re.sub(r'/*$', '', giturl)
     m = re.search(r'//(.+):x-oauth-basic@github.com', repo_name)
     if m:
@@ -21589,7 +21693,7 @@ def create_project(user_id, new_name):
         area = SavedFile(user_id, fix=True, section='playground' + sec)
         new_dir = os.path.join(area.directory, new_name)
         if not os.path.isdir(new_dir):
-            os.makedirs(new_dir)
+            os.makedirs(new_dir, exist_ok=True)
         path = os.path.join(new_dir, '.placeholder')
         with open(path, 'a', encoding='utf-8'):
             os.utime(path, None)
@@ -23493,12 +23597,11 @@ def needs_to_change_password():
         return False
     if not (current_user.social_id and current_user.social_id.startswith('local')):
         return False
-    # logmessage("needs_to_change_password: starting")
-    if app.user_manager.verify_password('password', current_user):
+    if r.get('da:insecure_password_present') is not None:
+        r.delete('da:insecure_password_present')
         session.pop('_flashes', None)
         flash(word("Your password is insecure and needs to be changed"), "warning")
         return True
-    # logmessage("needs_to_change_password: ending")
     return False
 
 
@@ -28547,12 +28650,17 @@ def api_package():
             branch = post_data.get('branch', None)
             if branch is None:
                 branch = get_master_branch(github_url)
-            packagename = re.sub(r'/*$', '', github_url)
-            packagename = re.sub(r'^git+', '', packagename)
-            packagename = re.sub(r'#.*', '', packagename)
-            packagename = re.sub(r'\.git$', '', packagename)
-            packagename = re.sub(r'.*/', '', packagename)
-            packagename = re.sub(r'^docassemble-', 'docassemble.', packagename)
+            m = re.search(r'#egg=(.*)', github_url)
+            if m:
+                packagename = re.sub(r'&.*', '', m.group(1))
+                github_url = re.sub(r'#.*', '', github_url)
+            else:
+                packagename = re.sub(r'/*$', '', github_url)
+                packagename = re.sub(r'^git+', '', packagename)
+                packagename = re.sub(r'#.*', '', packagename)
+                packagename = re.sub(r'\.git$', '', packagename)
+                packagename = re.sub(r'.*/', '', packagename)
+                packagename = re.sub(r'^docassemble-', 'docassemble.', packagename)
             if user_can_edit_package(giturl=github_url) and user_can_edit_package(pkgname=packagename):
                 install_git_package(packagename, github_url, branch)
                 if do_restart:
@@ -28839,12 +28947,17 @@ def api_playground_pull():
         branch = post_data.get('branch', None)
         if branch is None:
             branch = get_master_branch(github_url)
-        packagename = re.sub(r'/*$', '', github_url)
-        packagename = re.sub(r'^git+', '', packagename)
-        packagename = re.sub(r'#.*', '', packagename)
-        packagename = re.sub(r'\.git$', '', packagename)
-        packagename = re.sub(r'.*/', '', packagename)
-        packagename = re.sub(r'^docassemble-', 'docassemble.', packagename)
+        m = re.search(r'#egg=(.*)', github_url)
+        if m:
+            packagename = re.sub(r'&.*', '', m.group(1))
+            github_url = re.sub(r'#.*', '', github_url)
+        else:
+            packagename = re.sub(r'/*$', '', github_url)
+            packagename = re.sub(r'^git+', '', packagename)
+            packagename = re.sub(r'#.*', '', packagename)
+            packagename = re.sub(r'\.git$', '', packagename)
+            packagename = re.sub(r'.*/', '', packagename)
+            packagename = re.sub(r'^docassemble-', 'docassemble.', packagename)
     elif 'pip' in post_data:
         m = re.match(r'([^>=<]+)([>=<]+.+)', post_data['pip'])
         if m:
